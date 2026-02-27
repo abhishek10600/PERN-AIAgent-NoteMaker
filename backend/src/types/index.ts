@@ -3,3 +3,9 @@ export interface IUser {
   name: string;
   email: string;
 }
+
+export interface IJwtUserPayload {
+  id: string;
+  name: string;
+  email: string;
+}
