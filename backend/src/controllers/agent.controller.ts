@@ -6,6 +6,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 export const agentChat = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id as string;
+    // console.log({ userId });
     const { message } = req.body;
 
     const result = await runAgent(userId, message);
