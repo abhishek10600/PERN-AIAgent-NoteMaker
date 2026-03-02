@@ -2,17 +2,22 @@ import express, { Request, Response } from "express";
 import { prisma } from "./lib/prisma.js";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import dotenv from "dotenv";
+dotenv.config({
+  path: "./.env",
+});
 
 export const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
 app.use(
   cors({
     origin: process.env.CORS_ORIGINS,
+    credentials: true,
   })
 );
+app.use(cookieParser());
 
 // test route
 app.get("/health-check", (req, res) => {

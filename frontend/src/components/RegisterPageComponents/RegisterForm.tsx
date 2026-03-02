@@ -2,9 +2,48 @@ import { Card, CardContent } from "../ui/card";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import {
+  registerUserSchema,
+  type RegisterUserFormData,
+} from "@/schemas/auth.schema";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
+import { toast } from "sonner";
+import { registerUser } from "@/api/auth/auth.api";
+import { Spinner } from "../ui/spinner";
 
 const RegisterForm = () => {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState<boolean>(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<RegisterUserFormData>({
+    resolver: zodResolver(registerUserSchema),
+  });
+
+  const onSubmit = async (data: RegisterUserFormData) => {
+    console.log(data);
+    try {
+      setLoading(true);
+      setServerError(null);
+      const response = await registerUser(data);
+      toast.success("Account Created Successfully");
+      navigate("/");
+      reset();
+    } catch (error: any) {
+      setServerError(error.message);
+      toast(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="relative w-full max-w-md px-6">
       <Card className="bg-[#111827]/80 backdrop-blur border border-white/10 rounded-2xl shadow-2xl">
@@ -18,42 +57,77 @@ const RegisterForm = () => {
           </div>
 
           {/* FORM */}
-          <form className="flex flex-col gap-6">
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="flex flex-col gap-10"
+          >
             {/* NAME */}
             <div className="flex flex-col gap-2">
               <Label className="text-xs text-gray-400">Name</Label>
-              <Input
-                type="text"
-                placeholder="Enter your name"
-                className="bg-[#0b0f19] border-white/10 focus-visible:ring-indigo-500 text-gray-200 py-5"
-              />
+              <div className="relative">
+                <Input
+                  type="text"
+                  {...register("name")}
+                  placeholder="Enter your name"
+                  className="bg-[#0b0f19] border-white/10 focus-visible:ring-indigo-500 text-gray-200 py-5"
+                />
+                {errors.name && (
+                  <p className="absolute left-0 top-full mt-1 text-xs text-red-400">
+                    {errors.name.message}
+                  </p>
+                )}
+              </div>
             </div>
             {/* EMAIL */}
             <div className="flex flex-col gap-2">
               <Label className="text-xs text-gray-400">Email</Label>
-              <Input
-                type="email"
-                placeholder="Enter your email"
-                className="bg-[#0b0f19] border-white/10 focus-visible:ring-indigo-500 text-gray-200 py-5"
-              />
+              <div className="relative">
+                <Input
+                  type="email"
+                  {...register("email")}
+                  placeholder="Enter your email"
+                  className="bg-[#0b0f19] border-white/10 focus-visible:ring-indigo-500 text-gray-200 py-5"
+                />
+                {errors.email && (
+                  <p className="absolute left-0 top-full mt-1 text-xs text-red-400">
+                    {errors.email.message}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* PASSWORD */}
             <div className="flex flex-col gap-2">
               <Label className="text-xs text-gray-400">Password</Label>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                className="bg-[#0b0f19] border-white/10 focus-visible:ring-indigo-500 text-gray-200 py-5"
-              />
+              <div className="relative">
+                <Input
+                  type="password"
+                  {...register("password")}
+                  placeholder="•••••••"
+                  className="bg-[#0b0f19] border-white/10 focus-visible:ring-indigo-500 text-gray-200 py-5"
+                />
+                {errors.password && (
+                  <p className="absolute left-0 top-full mt-1 text-xs text-red-400">
+                    {errors.password.message}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Register BUTTON */}
             <Button
               type="submit"
+              disabled={loading}
               className="w-full bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-900/30 cursor-pointer py-5"
             >
-              Register
+              {loading ? (
+                <div className="flex gap-2 justify-center items-center">
+                  <Spinner />
+                  Creating Your Account
+                </div>
+              ) : (
+                "Register"
+              )}
             </Button>
           </form>
 
