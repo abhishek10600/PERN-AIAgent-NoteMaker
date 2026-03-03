@@ -4,16 +4,20 @@ import { useState } from "react";
 import { Spinner } from "../ui/spinner";
 import { logoutUser } from "@/api/auth/auth.api";
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { logout, setUser } from "@/store/slices/authSlice";
 
 const Navbar = () => {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
   const handleLogout = async () => {
     try {
       setLoading(true);
       const response = await logoutUser();
+      dispatch(logout());
       toast.success("Logged Out Successfully");
-      navigate("/login");
+      navigate("/login", { replace: true });
     } catch (error: any) {
       toast.error(error.message);
     } finally {

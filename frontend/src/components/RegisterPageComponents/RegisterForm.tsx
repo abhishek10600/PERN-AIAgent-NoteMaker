@@ -13,8 +13,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { registerUser } from "@/api/auth/auth.api";
 import { Spinner } from "../ui/spinner";
+import { useDispatch } from "react-redux";
+import { setUser } from "@/store/slices/authSlice";
 
 const RegisterForm = () => {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -33,6 +36,7 @@ const RegisterForm = () => {
       setLoading(true);
       setServerError(null);
       const response = await registerUser(data);
+      dispatch(setUser(response.data.user));
       toast.success("Account Created Successfully");
       navigate("/");
       reset();

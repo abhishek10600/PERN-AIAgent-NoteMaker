@@ -10,9 +10,12 @@ import { useState } from "react";
 import { Spinner } from "../ui/spinner";
 import { toast } from "sonner";
 import { loginUser } from "@/api/auth/auth.api";
+import { useDispatch } from "react-redux";
+import { setUser } from "@/store/slices/authSlice";
 
 const LoginForm = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [loading, setLoading] = useState<boolean>(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const {
@@ -31,6 +34,7 @@ const LoginForm = () => {
       setServerError(null);
       const response = await loginUser(data);
       const userName: string = response.data.user.name;
+      dispatch(setUser(response.data.user));
       toast.success(`Welcome back! ${userName}`);
       navigate("/");
       reset();
