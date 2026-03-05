@@ -2,6 +2,17 @@ import { prisma } from "../lib/prisma.js";
 import { normalize } from "../utils/normalize.js";
 
 export const noteService = {
+  async getAll(userId: string) {
+    return prisma.note.findMany({
+      where: {
+        userId,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  },
+
   async create(userId: string, content: string) {
     return prisma.note.create({
       data: {
@@ -95,17 +106,6 @@ export const noteService = {
       where: {
         id: noteId,
         userId,
-      },
-    });
-  },
-
-  async getAll(userId: string) {
-    return prisma.note.findMany({
-      where: {
-        userId,
-      },
-      orderBy: {
-        createdAt: "desc",
       },
     });
   },
