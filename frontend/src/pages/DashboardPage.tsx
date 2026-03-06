@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Navbar from "@/components/general/Navbar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { getAllNotes } from "@/api/notes/note.api";
 import { aiAgent } from "@/api/ai/ai.api";
 import { Spinner } from "@/components/ui/spinner";
+import { Mic, MicOff } from "lucide-react";
 
 interface Note {
   id: string;
@@ -13,17 +14,25 @@ interface Note {
   isCompleted: boolean;
 }
 
+type VoiceState = "idle" | "listening" | "processing" | "sending";
+
 const DashboardPage = () => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState<boolean>(false);
   const [sendMessageLoading, setSendMessageLoading] = useState<boolean>(false);
+  const [listening, setListening] = useState(false);
+  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
+
+  const recognitionRef = useRef<any>(null);
+  const sendMessageRef = useRef<(msg?: string) => Promise<void>>(
+    async () => {},
+  );
 
   const fetchNotes = async () => {
     try {
       const response = await getAllNotes();
       setNotes(response.data);
-      // console.log(response.data);
     } catch (error: any) {
       toast.error(error?.message);
     } finally {
@@ -35,16 +44,115 @@ const DashboardPage = () => {
     fetchNotes();
   }, []);
 
-  const sendMessage = async () => {
-    try {
-      setSendMessageLoading(true);
-      const response = await aiAgent(message);
+  const sendMessage = useCallback(
+    async (msg?: string) => {
+      const finalMessage = msg ?? message;
+
+      if (!finalMessage.trim()) return;
+
+      try {
+        setSendMessageLoading(true);
+        setVoiceState("sending");
+
+        await aiAgent(finalMessage);
+
+        setMessage("");
+        await fetchNotes();
+      } catch (error: any) {
+        toast.error(error?.message);
+      } finally {
+        setSendMessageLoading(false);
+        setVoiceState("idle");
+      }
+    },
+    [message],
+  );
+
+  // Keep ref always pointing to the latest sendMessage
+  useEffect(() => {
+    sendMessageRef.current = sendMessage;
+  }, [sendMessage]);
+
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      toast.error("Speech Recognition not supported in this browser");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    let silenceTimer: any = null;
+    let finalTranscript = "";
+
+    recognition.onresult = (event: any) => {
+      let interimTranscript = "";
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + " ";
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      const combined = finalTranscript + interimTranscript;
+      setMessage(combined);
+
+      clearTimeout(silenceTimer);
+
+      silenceTimer = setTimeout(() => {
+        if (finalTranscript.trim()) {
+          setVoiceState("processing");
+
+          const transcriptToSend = finalTranscript.trim();
+          finalTranscript = "";
+
+          setTimeout(() => {
+            // Use ref to avoid stale closure
+            sendMessageRef.current(transcriptToSend);
+          }, 800);
+
+          recognition.stop();
+          setListening(false);
+        }
+      }, 1500);
+    };
+
+    recognition.onerror = () => {
+      setListening(false);
+      setVoiceState("idle");
+      toast.error("Speech recognition error");
+    };
+
+    recognition.onend = () => {
+      setListening(false);
+    };
+
+    recognitionRef.current = recognition;
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) return;
+
+    if (listening) {
+      recognitionRef.current.stop();
+      setListening(false);
+      setVoiceState("idle");
+    } else {
       setMessage("");
-      await fetchNotes();
-    } catch (error: any) {
-      toast.error(error?.message);
-    } finally {
-      setSendMessageLoading(false);
+      recognitionRef.current.start();
+      setListening(true);
+      setVoiceState("listening");
     }
   };
 
@@ -59,7 +167,6 @@ const DashboardPage = () => {
             Your Workspace
           </h2>
 
-          {/* GRID */}
           <div className="grid gap-6 pb-32 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {notes.length === 0 ? (
               <p className="text-gray-500 text-sm">
@@ -99,27 +206,63 @@ const DashboardPage = () => {
 
       {/* AGENT INPUT */}
       <footer className="border-t border-white/10 bg-[#0b0f19]/80 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex gap-3">
-          <Input
-            placeholder="Tell the agent what to do..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            className="flex-1 bg-[#111827] border-white/10 focus-visible:ring-indigo-500"
-          />
+        <div className="max-w-6xl mx-auto px-6 py-3">
+          {/* VOICE STATUS */}
+          {voiceState !== "idle" && (
+            <div className="text-xs text-gray-400 flex items-center gap-2 mb-2">
+              {voiceState === "listening" && (
+                <>
+                  <span className="animate-pulse text-red-400">●</span>
+                  Listening...
+                </>
+              )}
 
-          <Button
-            onClick={sendMessage}
-            disabled={sendMessageLoading}
-            className="bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-900/30 cursor-pointer"
-          >
-            {sendMessageLoading ? (
-              <div className="flex justify-center items-center gap-2">
-                <Spinner />
-              </div>
-            ) : (
-              "Send"
-            )}
-          </Button>
+              {voiceState === "processing" && (
+                <>
+                  <Spinner />
+                  Processing speech...
+                </>
+              )}
+
+              {voiceState === "sending" && (
+                <>
+                  <Spinner />
+                  Sending to AI...
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-3 items-center">
+            <Input
+              placeholder="Tell the agent what to do..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="flex-1 bg-[#111827] border-white/10 focus-visible:ring-indigo-500"
+            />
+
+            {/* MIC BUTTON */}
+            <Button
+              type="button"
+              onClick={toggleListening}
+              className={`shadow-lg cursor-pointer ${
+                listening
+                  ? "bg-red-500 hover:bg-red-400"
+                  : "bg-indigo-600 hover:bg-indigo-500"
+              }`}
+            >
+              {listening ? <MicOff size={18} /> : <Mic size={18} />}
+            </Button>
+
+            {/* SEND BUTTON */}
+            <Button
+              onClick={() => sendMessage()}
+              disabled={sendMessageLoading}
+              className="bg-indigo-600 hover:bg-indigo-500 shadow-lg cursor-pointer"
+            >
+              {sendMessageLoading ? <Spinner /> : "Send"}
+            </Button>
+          </div>
         </div>
       </footer>
     </div>
